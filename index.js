@@ -10,7 +10,7 @@ import securityRoutes from "./routes/security.routes.js";
 
 dotenv.config();
 const app = express();
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 4000 || 3000;
 
 // ===== MIDDLEWARES =====
 app.use(express.json());
