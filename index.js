@@ -10,7 +10,8 @@ import securityRoutes from "./routes/security.routes.js";
 
 dotenv.config();
 const app = express();
-const PORT = process.env.PORT || 4000 || 3000;
+const PORT = process.env.PORT || 3000;
+const HOST = '0.0.0.0';
 
 // ===== MIDDLEWARES =====
 app.use(express.json());
@@ -91,6 +92,6 @@ app.get("/", (req, res) => {
 });
 
 // ===== INICIAR SERVIDOR =====
-app.listen(PORT, () => {
-  console.log(`Servidor corriendo en http://localhost:${PORT}`);
+app.listen(PORT, HOST, () => {
+  console.log(`Servidor corriendo en http://${HOST}:${PORT}`);
 });
