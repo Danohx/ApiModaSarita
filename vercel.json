@@ -1,0 +1,4 @@
+{
+  "key": "Permissions-Policy",
+  "value": "geolocation=(), microphone=(), camera=(), payment=()"
+}
