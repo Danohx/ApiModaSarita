@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { body, validationResult } from "express-validator"; // ✅ AÑADE ESTA IMPORTACIÓN
 import {
   register,
   login,
@@ -6,7 +7,7 @@ import {
   verifyMagicLink,
   verifyLogin2FA,
   requestPasswordReset,
-    resetPassword
+  resetPassword
 } from "../controllers/auth.controller.js";
 
 const router = Router();
@@ -20,6 +21,7 @@ const validar = (req, res, next) => {
     next();
 };
 
+// ✅ AHORA SÍ: 'body' está importado correctamente
 router.post("/register", [
     // Validamos y limpiamos (Sanitización)
     body('nombre').trim().escape(),
