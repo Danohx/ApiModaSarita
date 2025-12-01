@@ -117,6 +117,11 @@ app.get("/", (req, res) => {
 });
 
 // ===== INICIAR SERVIDOR =====
-app.listen(PORT, HOST, () => {
-  console.log(`Servidor corriendo en http://${HOST}:${PORT}`);
-});
+if (process.env.NODE_ENV !== 'production') {
+    app.listen(PORT, () => {
+        console.log(`💻 Servidor local corriendo en http://localhost:${PORT}`);
+    });
+}
+
+// Para Vercel, necesitamos exportar la app
+export default app;
