@@ -37,6 +37,10 @@ app.set('trust proxy', 1);
 
 // ===== MIDDLEWARES =====
 app.use(helmet());
+app.use((req, res, next) => {
+  res.setHeader("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
+  next();
+});
 app.use(express.json());
 
 // 2. Configuración de CORS segura para producción
