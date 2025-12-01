@@ -8,11 +8,34 @@ import pool from "./db/db.js";
 import authRoutes from "./routes/auth.routes.js";
 import securityRoutes from "./routes/security.routes.js";
 
+import rateLimit from 'express-rate-limit';
+
+import helmet from "helmet";
+
+const loginLimiter = rateLimit({
+    windowMs: 5 * 60 * 1000, // 5 minutos
+    max: 3, // Bloquea después del 3er intento fallido
+    message: { 
+        mensaje: "⛔ Demasiados intentos. Por seguridad, espera 5 minutos." 
+    },
+    standardHeaders: true, // Retorna info en los headers RateLimit-*
+    legacyHeaders: false,
+    keyGenerator: (req, res) => {
+        if (req.body && req.body.correo) {
+            return req.body.correo; // <--- Bloquea solo este correo
+        }
+        return req.ip; // <--- Bloquea toda la PC
+    }
+});
+
 dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 4000;
 
+app.set('trust proxy', 1);
+
 // ===== MIDDLEWARES =====
+app.use(helmet());
 app.use(express.json());
 
 // 2. Configuración de CORS segura para producción
@@ -22,6 +45,8 @@ app.use(cors({
 }));
 
 // ===== DEFINICIÓN DE RUTAS =====
+app.use("/api/auth/login", loginLimiter);
+app.use("/api/auth/2fa-verify", loginLimiter);
 app.use("/api/auth", authRoutes);
 app.use("/api/security", securityRoutes);
 
