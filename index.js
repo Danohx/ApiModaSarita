@@ -30,7 +30,8 @@ const loginLimiter = rateLimit({
 
 dotenv.config();
 const app = express();
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 3000;
+const HOST = '0.0.0.0';
 
 app.set('trust proxy', 1);
 
@@ -116,6 +117,6 @@ app.get("/", (req, res) => {
 });
 
 // ===== INICIAR SERVIDOR =====
-app.listen(PORT, () => {
-  console.log(`Servidor corriendo en http://localhost:${PORT}`);
+app.listen(PORT, HOST, () => {
+  console.log(`Servidor corriendo en http://${HOST}:${PORT}`);
 });
