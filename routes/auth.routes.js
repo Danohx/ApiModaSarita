@@ -10,7 +10,8 @@ import {
   resetPassword,
   refreshSession, 
   logout, 
-  revokeAllSessions
+  revokeAllSessions,
+  verifySession
 } from "../controllers/auth.controller.js";
 import { authenticateJWT } from "../middleware/seguridad.js";
 
