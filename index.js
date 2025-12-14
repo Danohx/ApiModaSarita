@@ -19,6 +19,7 @@ const loginLimiter = rateLimit({
         mensaje: "⛔ Demasiados intentos. Por seguridad, espera 5 minutos." 
     },
     standardHeaders: true, // Retorna info en los headers RateLimit-*
+    skipSuccessfulRequests: true,
     legacyHeaders: false,
     keyGenerator: (req, res) => {
         if (req.body && req.body.correo) {
