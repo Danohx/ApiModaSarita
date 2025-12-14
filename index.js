@@ -52,6 +52,7 @@ app.use(cors({
 // ===== DEFINICIÓN DE RUTAS =====
 app.use("/api/auth/login", loginLimiter);
 app.use("/api/auth/2fa-verify", loginLimiter);
+app.use("/api/auth/forgot-password", loginLimiter);
 app.use("/api/auth", authRoutes);
 app.use("/api/security", securityRoutes);
 

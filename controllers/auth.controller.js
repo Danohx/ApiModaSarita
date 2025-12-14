@@ -6,7 +6,7 @@ import bcrypt from "bcryptjs";
 import pool from "../db/db.js"; // Necesitamos la DB
 import {
   generateAccessToken,
-  createSession,
+  generateRefreshToken,
   generateTempToken,
   verifyTempToken,
   verify2FAToken,
@@ -128,12 +128,22 @@ export const login = async (req, res) => {
 
     // 4. NO TIENE 2FA: Iniciar sesión directamente
     const accessToken = generateAccessToken(user.id, user.correo);
-    const sessionId = createSession(user.id, "contrasena");
+    const refreshToken = generateRefreshToken(user.id);
+
+    const userAgent = req.headers['user-agent'] || 'Unknown';
+    const ip = req.ip;
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    
+    await pool.promise().query(
+      `INSERT INTO user_sessions (user_id, refresh_token, user_agent, ip_address, expires_at) 
+       VALUES (?, ?, ?, ?, ?)`,
+      [user.id, refreshToken, userAgent, ip, expiresAt]
+    );
 
     res.json({
       requires2FA: false,
       accessToken: accessToken,
-      sessionId: sessionId,
+      refreshToken: refreshToken,
       mensaje: "Inicio de sesión exitoso.",
     });
   } catch (error) {
@@ -224,24 +234,18 @@ export const sendMagicLink = async (req, res) => {
 
 export const verifyMagicLink = async (req, res) => {
   const { token } = req.body;
-  if (!token)
-    return res.status(400).json({ mensaje: "Token no proporcionado" });
+  if (!token) return res.status(400).json({ mensaje: "Token no proporcionado" });
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const { correo } = decoded;
 
-    // 1. Buscar al usuario en la BD (con await)
-    const [users] = await pool
-      .promise()
-      .query("SELECT id, tfa_enabled FROM usuarios WHERE correo = ?", [correo]);
+    const [users] = await pool.promise().query("SELECT id, nombre, correo, tfa_enabled FROM usuarios WHERE correo = ?", [correo]);
 
-    if (users.length === 0)
-      return res.status(404).json({ mensaje: "Usuario no encontrado." });
+    if (users.length === 0) return res.status(404).json({ mensaje: "Usuario no encontrado." });
 
     const user = users[0];
 
-    // 2. Revisar si tiene 2FA activado
     if (user.tfa_enabled) {
       const tempToken = generateTempToken(user.id, correo);
       res.json({
@@ -250,13 +254,24 @@ export const verifyMagicLink = async (req, res) => {
         mensaje: "Enlace verificado. Se requiere 2FA.",
       });
     } else {
+      // 2. CORRECCIÓN: Generar Refresh Token y Guardar en BD (Igual que login)
       const accessToken = generateAccessToken(user.id, correo);
-      const sessionId = createSession(user.id, "magiclink");
+      const refreshToken = generateRefreshToken(user.id);
+      
+      const userAgent = req.headers['user-agent'] || 'Unknown';
+      const ip = req.ip;
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+      await pool.promise().query(
+        `INSERT INTO user_sessions (user_id, refresh_token, user_agent, ip_address, expires_at) VALUES (?, ?, ?, ?, ?)`,
+        [user.id, refreshToken, userAgent, ip, expiresAt]
+      );
 
       res.json({
         requires2FA: false,
-        accessToken: accessToken,
-        sessionId: sessionId,
+        accessToken,
+        refreshToken, // <--- Importante enviar esto
+        user: { nombre: user.nombre, correo: user.correo },
         mensaje: "Inicio de sesión exitoso.",
       });
     }
@@ -265,56 +280,52 @@ export const verifyMagicLink = async (req, res) => {
   }
 };
 
-// ---- ¡NUEVA FUNCIÓN NECESARIA! ----
-// Función para verificar el código 2FA durante el login
+// ===== VERIFICAR LOGIN 2FA (CORREGIDO) =====
 export const verifyLogin2FA = async (req, res) => {
   const { tempToken, otpCode } = req.body;
-  if (!tempToken || !otpCode)
-    return res.status(400).json({ mensaje: "Faltan datos." });
+  if (!tempToken || !otpCode) return res.status(400).json({ mensaje: "Faltan datos." });
 
   try {
-    // 1. Verificar el token temporal
     const decoded = verifyTempToken(tempToken);
     const { id: userId, correo } = decoded;
 
-    // 2. Obtener el secreto 2FA del usuario
-    const sql = "SELECT tfa_secret FROM usuarios WHERE id = ?";
-    
-    // (Asegúrate de que tu lógica de BD esté aquí...)
-    // Voy a asumir que estás usando la versión con Promesas que te mostré:
+    // Obtenemos nombre también para enviarlo al frontend
+    const sql = "SELECT id, nombre, correo, tfa_secret FROM usuarios WHERE id = ?";
     const [results] = await pool.promise().query(sql, [userId]);
 
-    if (results.length === 0)
-      return res.status(404).json({ mensaje: "Usuario no encontrado." });
+    if (results.length === 0) return res.status(404).json({ mensaje: "Usuario no encontrado." });
 
-    const { tfa_secret } = results[0];
-    const isValid = verify2FAToken(tfa_secret, otpCode);
+    const user = results[0];
+    const isValid = verify2FAToken(user.tfa_secret, otpCode);
 
     if (isValid) {
-      // 3. Código VÁLIDO: Iniciar sesión
+      // 3. CORRECCIÓN: Generar Refresh Token y Guardar en BD
       const accessToken = generateAccessToken(userId, correo);
-      const sessionId = createSession(userId, "magiclink_2fa");
+      const refreshToken = generateRefreshToken(userId);
+
+      const userAgent = req.headers['user-agent'] || 'Unknown';
+      const ip = req.ip;
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+      await pool.promise().query(
+        `INSERT INTO user_sessions (user_id, refresh_token, user_agent, ip_address, expires_at) VALUES (?, ?, ?, ?, ?)`,
+        [userId, refreshToken, userAgent, ip, expiresAt]
+      );
 
       res.json({
         success: true,
-        accessToken: accessToken,
-        sessionId: sessionId,
+        accessToken,
+        refreshToken, // <--- Importante
+        user: { nombre: user.nombre, correo: user.correo },
         mensaje: "Inicio de sesión 2FA exitoso.",
       });
     } else {
-      // 4. Código INVÁLIDO
       res.status(401).json({ success: false, mensaje: "Código 2FA inválido." });
     }
     
   } catch (err) {
-    // --- ¡BLOQUE MEJORADO! ---
-    console.error("Error al verificar 2FA:", err.message); // <-- Para tu terminal
-    
-    // Envía el error real a Postman
-    res.status(401).json({ 
-        mensaje: "Error al verificar el token temporal.",
-        error: err.message 
-    });
+    console.error("Error al verificar 2FA:", err.message);
+    res.status(401).json({ mensaje: "Error al verificar el token temporal.", error: err.message });
   }
 };
 
@@ -459,5 +470,50 @@ export const resetPassword = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ mensaje: "Error al actualizar contraseña." });
+  }
+};
+
+export const refreshSession = async (req, res) => {
+  const { refreshToken } = req.body;
+  if (!refreshToken) return res.status(401).json({ mensaje: "Token requerido" });
+
+  try {
+    const decoded = jwt.verify(refreshToken, process.env.REFRESH_SECRET || "secreto_super_seguro_refresh");
+
+    // Verificar en BD
+    const [sessions] = await pool.promise().query("SELECT * FROM user_sessions WHERE refresh_token = ?", [refreshToken]);
+    if (sessions.length === 0) return res.status(403).json({ mensaje: "Sesión inválida o revocada." });
+
+    const [users] = await pool.promise().query("SELECT id, correo FROM usuarios WHERE id = ?", [decoded.id]);
+    if (users.length === 0) return res.status(403).json({ mensaje: "Usuario no existe" });
+    
+    const accessToken = generateAccessToken(users[0].id, users[0].correo);
+    res.json({ accessToken });
+
+  } catch (error) {
+    return res.status(403).json({ mensaje: "Token inválido o expirado" });
+  }
+};
+
+export const logout = async (req, res) => {
+  const { refreshToken } = req.body;
+  
+  // Borramos solo ESTA sesión de la base de datos
+  await pool.promise().query("DELETE FROM user_sessions WHERE refresh_token = ?", [refreshToken]);
+  
+  res.sendStatus(204);
+};
+
+export const revokeAllSessions = async (req, res) => {
+  const userId = req.user.id; // Viene del middleware authenticateJWT
+
+  try {
+    // BORRA TODAS las sesiones de este usuario en la tabla
+    await pool.promise().query("DELETE FROM user_sessions WHERE user_id = ?", [userId]);
+    
+    res.json({ mensaje: "Se han cerrado todas las sesiones en todos los dispositivos." });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ mensaje: "Error al revocar sesiones." });
   }
 };

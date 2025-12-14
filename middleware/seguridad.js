@@ -4,9 +4,6 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import speakeasy from "speakeasy";
 
-// ===== SIMULACIÓN DE BASE DE DATOS (EN MEMORIA) =====
-export const activeSessions = new Map(); // sessionId -> { userId, ... }
-
 // ===== 1. GESTIÓN DE TOKENS DE ACCESO (JWT) =====
 export function generateAccessToken(userId, email) {
   return jwt.sign({ id: userId, correo: email }, process.env.JWT_SECRET, {
@@ -82,5 +79,8 @@ export function verify2FAToken(secret, token) {
   });
 }
 
-// ===== 5. TAREA DE LIMPIEZA AUTOMÁTICA =====
-// ... (El setInterval de limpieza de sesiones)
+export function generateRefreshToken(userId) {
+  return jwt.sign({ id: userId }, process.env.REFRESH_SECRET || "secreto_super_seguro_refresh", {
+    expiresIn: "7d",
+  });
+}
