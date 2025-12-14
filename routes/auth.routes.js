@@ -83,4 +83,5 @@ router.post("/logout", logout);
 // Requiere authenticateJWT para saber QUÉ usuario está solicitando esto
 router.post("/revoke-all", authenticateJWT, revokeAllSessions);
 
+router.get("/verify", authenticateJWT, verifySession);
 export default router;

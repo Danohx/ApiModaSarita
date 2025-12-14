@@ -517,3 +517,7 @@ export const revokeAllSessions = async (req, res) => {
     res.status(500).json({ mensaje: "Error al revocar sesiones." });
   }
 };
+
+export const verifySession = (req, res) => {
+    res.json({ ok: true, user: req.user });
+};
