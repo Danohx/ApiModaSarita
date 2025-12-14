@@ -3,6 +3,7 @@
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import speakeasy from "speakeasy";
+import pool from "../db/db.js";
 
 // ===== 1. GESTIÓN DE TOKENS DE ACCESO (JWT) =====
 export function generateAccessToken(userId, email) {
@@ -31,19 +32,39 @@ export function createSession(userId, authMethod = "magiclink") {
 // ... (Aquí irían closeSession y getUserActiveSessions si los necesitas)
 
 // ===== 3. MIDDLEWARE DE AUTENTICACIÓN JWT =====
-export function authenticateJWT(req, res, next) {
-  const h = req.headers.authorization;
-  if (!h?.startsWith("Bearer "))
-    return res.status(401).json({ mensaje: "Token requerido" });
-  try {
-    const d = verifyAccessToken(h.slice(7));
-    req.user = d;
-    req.userId = d.id;
-    next();
-  } catch {
-    return res.status(401).json({ mensaje: "Token inválido o expirado" });
+export const authenticateJWT = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+
+  if (authHeader) {
+    const token = authHeader.split(' ')[1];
+
+    jwt.verify(token, process.env.JWT_SECRET, async (err, user) => {
+      if (err) {
+        return res.status(403).json({ mensaje: "Token inválido o expirado" });
+      }
+
+      try {
+        const [sessions] = await pool.promise().query(
+          "SELECT id FROM user_sessions WHERE user_id = ? LIMIT 1", 
+          [user.id]
+        );
+
+        if (sessions.length === 0)
+           return res.status(401).json({ mensaje: "Sesión revocada remotamente." });
+
+        req.user = user;
+        req.userId = user.id;
+        next();
+
+      } catch (dbError) {
+        console.error(dbError);
+        return res.status(500).json({ mensaje: "Error verificando sesión." });
+      }
+    });
+  } else {
+    res.sendStatus(401);
   }
-}
+};
 
 // ===== 4. LÓGICA DE DOBLE FACTOR (2FA) =====
 export function generateTempToken(userId, email) {
