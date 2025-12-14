@@ -12,6 +12,10 @@ import rateLimit from 'express-rate-limit';
 
 import helmet from "helmet";
 
+const allowedOrigins = [
+  process.env.FRONTEND_URL // Por si la defines en variables de entorno
+];
+
 const loginLimiter = rateLimit({
     windowMs: 5 * 60 * 1000, // 5 minutos
     max: 3, // Bloquea después del 3er intento fallido
@@ -45,9 +49,20 @@ app.use((req, res, next) => {
 app.use(express.json());
 
 // 2. Configuración de CORS segura para producción
-const frontendURL = process.env.FRONTEND_URL || "http://localhost:5173";
 app.use(cors({
-  origin: frontendURL
+  origin: function (origin, callback) {
+    // Permitir solicitudes sin origen (como Postman o Mobile Apps)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'La política CORS de este sitio no permite acceso desde el origen especificado.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
+  credentials: true, // <--- ¡ESTO ES LO QUE TE FALTABA!
+  methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+  allowedHeaders: "Content-Type,Authorization"
 }));
 
 // ===== DEFINICIÓN DE RUTAS =====
