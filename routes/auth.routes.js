@@ -1,4 +1,5 @@
 import { Router } from "express";
+import rateLimit from 'express-rate-limit';
 import { body, validationResult } from "express-validator"; // ✅ AÑADE ESTA IMPORTACIÓN
 import {
   register,
@@ -16,6 +17,19 @@ import {
 import { authenticateJWT } from "../middleware/seguridad.js";
 
 const router = Router();
+
+const forgotPasswordLimiter = rateLimit({
+    windowMs: 5 * 60 * 1000, // 15 minutos
+    max: 3, // Límite de 3 intentos
+    message: { 
+        mensaje: "Has superado el límite de intentos. Por favor espera 5 minutos." 
+    },
+    standardHeaders: true, // Retorna info del límite en los headers
+    legacyHeaders: false,
+    keyGenerator: (req, res) => {
+        return req.body.correo || req.ip;
+    }
+});
 
 // Middleware auxiliar para no repetir código
 const validar = (req, res, next) => {
@@ -69,7 +83,7 @@ router.post("/magic-verify", verifyMagicLink);
 router.post("/2fa-verify", verifyLogin2FA);
 
 // Solicitar cambio (envía el correo)
-router.post("/forgot-password", requestPasswordReset);
+router.post("/forgot-password", forgotPasswordLimiter, requestPasswordReset);
 
 // Guardar la nueva contraseña
 router.post("/reset-password", resetPassword);
