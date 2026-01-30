@@ -144,6 +144,11 @@ export const login = async (req, res) => {
       requires2FA: false,
       accessToken: accessToken,
       refreshToken: refreshToken,
+      user: { 
+        // nombre: user.nombre,
+        correo: user.correo,
+        tfaEnabled: user.tfa_enabled === 1 
+      },
       mensaje: "Inicio de sesión exitoso.",
     });
   } catch (error) {
@@ -271,7 +276,7 @@ export const verifyMagicLink = async (req, res) => {
         requires2FA: false,
         accessToken,
         refreshToken, // <--- Importante enviar esto
-        user: { nombre: user.nombre, correo: user.correo },
+        user: { nombre: user.nombre, correo: user.correo, tfaEnabled: user.tfa_enabled === 1 },
         mensaje: "Inicio de sesión exitoso.",
       });
     }
@@ -316,7 +321,7 @@ export const verifyLogin2FA = async (req, res) => {
         success: true,
         accessToken,
         refreshToken, // <--- Importante
-        user: { nombre: user.nombre, correo: user.correo },
+        user: { nombre: user.nombre, correo: user.correo, tfaEnabled: true },
         mensaje: "Inicio de sesión 2FA exitoso.",
       });
     } else {
